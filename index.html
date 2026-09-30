@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Bom pagador ou inadimplente? — Regressão logística, sem fórmulas</title>
+<style>
+:root{--bg:#fdf5e6;--ink:#2b2540;--muted:#6b6580;--green:#2f9e5f;--orange:#f28c0f;--card:#ffffff;--line:#eadfca;--accent:#6d4aff;--red:#e5484d}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}
+[hidden]{display:none!important}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);line-height:1.45;min-height:100vh;
+background:radial-gradient(1000px 520px at 5% -10%,#ffe6b8 0,transparent 60%),radial-gradient(900px 500px at 105% 0,#d9f3e2 0,transparent 55%),var(--bg);
+padding-bottom:env(safe-area-inset-bottom)}
+.app{max-width:1100px;margin:0 auto;padding:14px 14px 40px}
+header{padding:6px 2px 10px}
+.badge{display:inline-block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--accent);background:#ece7ff;padding:5px 10px;border-radius:99px}
+h1{margin:8px 0 2px;font-size:clamp(26px,6.5vw,40px);line-height:1.05;letter-spacing:-.02em}
+h1 .g{color:var(--green)}h1 .o{color:var(--orange)}
+.sub{margin:0;color:var(--muted);font-size:15px}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:10px 0 12px}
+.steps button{font:inherit;border:2px solid var(--line);background:#fff;color:var(--ink);border-radius:14px;min-height:50px;padding:6px 4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;transition:.2s}
+.steps button b{font-size:13px;width:22px;height:22px;border-radius:50%;background:#f1ead9;display:grid;place-items:center}
+.steps button span{font-size:12px;font-weight:650}
+.steps button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.steps button.on b{background:var(--orange);color:#fff}
+.steps button.seen:not(.on) b{background:#cdeedb}
+.layout{display:block}
+.card{background:var(--card);border-radius:22px;box-shadow:0 6px 24px rgba(80,55,10,.10);border:1px solid rgba(0,0,0,.04)}
+.stage{padding:14px;margin-bottom:14px}
+.mission{font-size:17px;font-weight:700;line-height:1.3;margin:0 0 10px}
+.hud{margin-bottom:10px}
+.hudRow{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+#hudMain{font-size:30px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+#hudSub{font-size:13px;color:var(--muted);flex:1;min-width:140px}
+.track{position:relative;height:10px;border-radius:9px;background:#efe6d3;margin-top:6px;overflow:visible}
+.track .fill{position:absolute;left:0;top:0;bottom:0;border-radius:9px;background:linear-gradient(90deg,var(--green),var(--orange));transition:width .15s}
+.track.grad{background:linear-gradient(90deg,var(--green),#f5ecd6 50%,var(--orange))}
+.track.grad .fill{display:none}
+.track .mk{display:none;position:absolute;top:-5px;width:20px;height:20px;margin-left:-10px;border-radius:50%;background:#fff;border:3px solid var(--ink);box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.track.grad .mk{display:block}
+.cvwrap{position:relative;width:100%;aspect-ratio:1/.94;border-radius:18px;overflow:hidden;background:#fffdf8}
+canvas#cv{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:grab;outline:none;display:block}
+canvas#cv:focus-visible{box-shadow:inset 0 0 0 3px var(--accent)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:13px;color:var(--muted)}
+.lg{display:inline-flex;align-items:center;gap:6px}
+.dot{width:14px;height:14px;border-radius:50%;display:inline-block;border:2px solid var(--ink)}
+.dot.g{background:#48b877}.dot.o{background:#ffa122}
+.ring{width:16px;height:16px;border-radius:50%;border:2px dashed var(--red);display:inline-block}
+.panel{padding:16px}
+.panel h2{margin:0 0 6px;font-size:21px;letter-spacing:-.01em}
+.panel p{margin:8px 0;font-size:15.5px}
+.hint{color:var(--muted);font-size:14px}
+.note{border-radius:14px;padding:11px 13px;font-size:14.5px;margin:12px 0;background:#f4f0ff;border-left:5px solid var(--accent)}
+.note.warn{background:#fff3e0;border-left-color:var(--orange)}
+.note.ok{background:#e8f8ee;border-left-color:var(--green)}
+.note b{font-weight:750}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.btn{font:inherit;font-weight:700;font-size:15px;min-height:48px;padding:10px 16px;border-radius:99px;border:2px solid var(--ink);background:#fff;color:var(--ink);cursor:pointer;flex:1 1 140px;transition:transform .1s,background .2s}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--ink);color:#fff}
+.btn.go{background:linear-gradient(135deg,#ff9f1c,#f2620f);border-color:transparent;color:#fff}
+.btn.sm{font-size:14px;flex:1 1 90px;padding:8px 10px}
+.sliderBox{margin:14px 0 6px}
+.sliderBox label{display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:var(--muted)}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:44px;background:transparent;margin:0}
+input[type=range]:focus{outline:none}
+input[type=range]::-webkit-slider-runnable-track{height:12px;border-radius:99px;background:linear-gradient(90deg,var(--green),#f4e6c8,var(--orange))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:34px;height:34px;border-radius:50%;background:#fff;border:3px solid var(--ink);margin-top:-11px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+input[type=range]::-moz-range-track{height:12px;border-radius:99px;background:linear-gradient(90deg,var(--green),#f4e6c8,var(--orange))}
+input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;background:#fff;border:3px solid var(--ink)}
+input[type=range].k::-webkit-slider-runnable-track{background:linear-gradient(90deg,#d9d2f5,var(--accent))}
+input[type=range].k::-moz-range-track{background:linear-gradient(90deg,#d9d2f5,var(--accent))}
+.chartBox{background:#fffaf0;border:1px solid var(--line);border-radius:16px;padding:8px 8px 4px;margin:12px 0}
+.chartBox .ct{font-size:12.5px;font-weight:700;color:var(--muted);margin:0 0 2px 4px}
+#chart{display:block;width:100%;height:150px}
+.cards2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.mini{background:#fffaf0;border:1px solid var(--line);border-radius:16px;padding:10px 12px;font-size:13px;color:var(--muted)}
+.mini b{display:block;font-size:28px;color:var(--ink);line-height:1.1}
+.mini.bad b{color:var(--red)}
+.recap{background:linear-gradient(135deg,#2b2540,#41346b);color:#fff;border-radius:18px;padding:14px 16px;margin:14px 0}
+.recap h3{margin:0 0 8px;font-size:17px}
+.recap ol{margin:0;padding-left:20px;font-size:15px}
+.recap li{margin:6px 0}
+details{margin:14px 0 4px;border:1px dashed #cfc4aa;border-radius:14px;padding:4px 12px;background:#fffdf7}
+summary{cursor:pointer;font-weight:700;font-size:14.5px;min-height:44px;display:flex;align-items:center;color:var(--muted)}
+details pre{white-space:pre-wrap;font:12.5px/1.5 ui-monospace,Menlo,Consolas,monospace;background:#f6f0e0;padding:10px;border-radius:10px;overflow-x:auto;margin:6px 0}
+details p{font-size:13.5px!important;color:var(--muted)}
+.pager{display:flex;gap:8px;margin-top:14px}
+.pager .btn{flex:1}
+.pager .btn[disabled]{opacity:.35;pointer-events:none}
+@media (min-width:920px){
+ .layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px;align-items:start}
+ .stage{position:sticky;top:12px;margin-bottom:0}
+ .cvwrap{aspect-ratio:1/1}
+ .app{padding-top:22px}
+ .steps button{flex-direction:row;gap:8px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+ <span class="badge">Explicador visual · Risco de crédito</span>
+ <h1>Cliente <span class="g">bom pagador</span> ou <span class="o">inadimplente</span>?</h1>
+ <p class="sub">Descubra como um banco estima o risco de calote — só arrastando uma linha.</p>
+</header>
+
+<nav class="steps" id="steps" aria-label="Passos">
+ <button data-s="1"><b>1</b><span>Separar</span></button>
+ <button data-s="2"><b>2</b><span>Chance</span></button>
+ <button data-s="3"><b>3</b><span>Aprender</span></button>
+ <button data-s="4"><b>4</b><span>Decidir</span></button>
+</nav>
+
+<div class="layout">
+<section class="card stage" id="stage">
+ <p class="mission" id="mission"></p>
+ <div class="hud" aria-live="polite">
+  <div class="hudRow"><div id="hudMain">–</div><div id="hudSub"></div></div>
+  <div class="track" id="trk"><div class="fill" id="fill"></div><div class="mk" id="mk"></div></div>
+ </div>
+ <div class="cvwrap" id="cvwrap">
+  <canvas id="cv" tabindex="0" role="img" aria-label="Gráfico de clientes: eixo horizontal é a parcela da renda comprometida com dívidas, eixo vertical é a quantidade de atrasos anteriores. Arraste a linha para separar bons pagadores e inadimplentes. Setas do teclado movem a linha; colchetes giram."></canvas>
+ </div>
+ <div class="legend">
+  <span class="lg"><i class="dot g"></i>Bom pagador</span>
+  <span class="lg"><i class="dot o"></i>Inadimplente</span>
+  <span class="lg"><i class="ring"></i>Errada</span>
+ </div>
+</section>
+
+<section class="card panel" id="panel">
+
+ <div class="sb" data-s="1">
+  <h2>1 · Separar</h2>
+  <p>Cada bolinha é um cliente que pediu crédito. Quanto mais à <b>direita</b>, maior a parte da renda já comprometida com dívidas; quanto mais no <b>alto</b>, mais atrasos ele já teve no histórico.</p>
+  <p class="hint">Arraste o botão ✥ para mover a linha e o ↻ para girá-la (ou arraste em qualquer ponto do gráfico).</p>
+  <div class="note" id="verdict1">…</div>
+  <div class="note warn">💡 <b>Nenhuma linha acerta todos.</b> Gente de verdade é imprevisível: um bom pagador pode ter um mês difícil, e um cliente arriscado pode nunca atrasar. É por isso que o próximo passo existe: trocar o "sim ou não" por uma <b>chance</b>.</div>
+ </div>
+
+ <div class="sb" data-s="2" hidden>
+  <h2>2 · A linha vira uma chance</h2>
+  <p>Repare: a linha não é um muro. Ela é o ponto onde você fica <b>na dúvida (50%)</b>. Quanto mais longe dela, mais certeza.</p>
+  <p class="hint">👆 Toque ou arraste no gráfico para colocar o cliente misterioso.</p>
+  <div class="note ok" id="cap2">…</div>
+  <div class="sliderBox">
+   <label><span>🤔 Cautelosa</span><span>Firmeza da linha</span><span>Radical 😤</span></label>
+   <input type="range" class="k" id="kSlider" min="0" max="100" value="50" aria-label="Firmeza da linha">
+  </div>
+  <p class="hint" id="kcap"></p>
+  <div class="slot" id="slot2"></div>
+  <div class="note warn">⚠️ <b>Cuidado:</b> "78%" não significa que o cliente é "78% inadimplente" — ele vai pagar ou não vai. Significa: de cada 100 clientes <i>com esse perfil</i>, cerca de 78 dão calote.</div>
+ </div>
+
+ <div class="sb" data-s="3" hidden>
+  <h2>3 · A máquina aprende</h2>
+  <p>Ela repete um ciclo: <b>① chuta uma linha → ② mede o erro → ③ empurra a linha um pouquinho para errar menos → ④ repete.</b></p>
+  <div class="row">
+   <button class="btn go" id="btnTrain">▶ Treinar</button>
+   <button class="btn sm" id="btnScramble">🎲 Bagunçar linha</button>
+   <button class="btn sm" id="btnRestore">↺ Restaurar clientes</button>
+   <button class="btn sm" id="btnSpeed">⏩ Rápido</button>
+  </div>
+  <div class="note ok" id="cmp3">Aperte <b>Treinar</b> e olhe a linha se mexer sozinha.</div>
+  <div class="slot" id="slot3"></div>
+  <div class="note">🎯 <b>Por que "erro" e não só "acertos"?</b> Errar com muita certeza dói bem mais do que errar na dúvida. Assim o modelo aprende a ser humilde.</div>
+  <div class="note warn">🧪 Experimente: <b>arraste um cliente</b> para longe do grupo (um caso atípico) e veja a linha correr atrás dele.</div>
+ </div>
+
+ <div class="sb" data-s="4" hidden>
+  <h2>4 · Você decide o corte</h2>
+  <p>O modelo dá a chance de calote. <b>Quem decide</b> a partir de quanto o crédito é negado é você.</p>
+  <div class="sliderBox">
+   <label><span>Rigoroso (5%)</span><span id="thrVal">Corte: 50%</span><span>Permissivo (95%)</span></label>
+   <input type="range" id="thrSlider" min="5" max="95" value="50" aria-label="Corte de decisão">
+  </div>
+  <div class="row">
+   <button class="btn sm" data-t="20">Evitar calote</button>
+   <button class="btn sm" data-t="50">Equilibrado</button>
+   <button class="btn sm" data-t="90">Aprovar mais</button>
+  </div>
+  <div class="cards2">
+   <div class="mini bad"><b id="fpn">0</b>bons pagadores recusados 😕 (negócio perdido)</div>
+   <div class="mini bad"><b id="fnn">0</b>inadimplentes aprovados 😖 (prejuízo com calote)</div>
+  </div>
+  <div class="note" id="cap4">…</div>
+  <div class="slot" id="slot4"></div>
+  <div class="recap">
+   <h3>🗣️ Explique para um amigo em 3 frases</h3>
+   <ol>
+    <li>A regressão logística <b>traça uma linha</b> entre dois grupos (bom pagador × inadimplente).</li>
+    <li>Em vez de só dizer sim ou não, ela dá uma <b>chance de calote</b>: longe da linha = certeza, perto = dúvida.</li>
+    <li>Ela <b>aprende sozinha</b>, ajustando a linha aos poucos até errar o mínimo — e você escolhe o corte de aprovação.</li>
+   </ol>
+  </div>
+  <div class="note warn">⚠️ O nome engana: apesar de "regressão", ela serve para <b>classificar</b>. E só sabe traçar <b>linha reta</b> (nada de curvas). Na vida real os bancos usam dezenas de variáveis (renda, idade, score, tempo de conta…); aqui são só duas para caber num desenho.</div>
+ </div>
+
+ <div class="chartBox" id="chartBox" hidden>
+  <p class="ct" id="chartTitle"></p>
+  <canvas id="chart" aria-hidden="true"></canvas>
+ </div>
+
+ <details id="mathDet">
+  <summary>🔬 Ver a matemática (opcional)</summary>
+  <pre id="mathTxt"></pre>
+  <p>z positivo → mais provável inadimplente · z negativo → mais provável bom pagador · z = 0 → 50%. A "firmeza" que você mexeu é o tamanho desses pesos: quanto maiores, mais íngreme a curva em S.</p>
+ </details>
+
+ <div class="pager">
+  <button class="btn" id="prev">← Voltar</button>
+  <button class="btn primary" id="next">Próximo →</button>
+ </div>
+</section>
+</div>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $=s=>document.querySelector(s),$$=s=>Array.prototype.slice.call(document.querySelectorAll(s));
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const sig=z=>1/(1+Math.exp(-clamp(z,-40,40)));
+const GREEN=[47,158,95],ORANGE=[242,140,15];
+const mixc=(a,b,t)=>[lerp(a[0],b[0],t),lerp(a[1],b[1],t),lerp(a[2],b[2],t)];
+const rgb=c=>'rgb('+(c[0]|0)+','+(c[1]|0)+','+(c[2]|0)+')';
+
+/* ---------- dados ---------- */
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const R=rng(11);
+function gauss(){let u=0;while(!u)u=R();const v=R();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+const pts=[];
+function cluster(mx,my,n,c){for(let i=0;i<n;i++){const a=gauss()*0.11,b=gauss()*0.11;pts.push({x:clamp(mx+a,.05,.95),y:clamp(my+b*.9+a*.3,.05,.95),c:c})}}
+cluster(.31,.34,14,0);cluster(.69,.66,14,1);
+pts.push({x:.58,y:.50,c:0},{x:.52,y:.38,c:0},{x:.44,y:.56,c:1},{x:.40,y:.46,c:1});
+const orig=pts.map(p=>({x:p.x,y:p.y}));
+
+/* ---------- modelo ---------- */
+const M={cx:.42,cy:.60,th:-.35,k:14};
+function prob(x,y,k){const kk=k===undefined?M.k:k;return sig(kk*((x-M.cx)*Math.cos(M.th)+(y-M.cy)*Math.sin(M.th)))}
+function lossAcc(t){t=t===undefined?.5:t;let L=0,ok=0,fp=0,fn=0;const c=Math.cos(M.th),s=Math.sin(M.th);
+ for(const p of pts){const q=sig(M.k*((p.x-M.cx)*c+(p.y-M.cy)*s));
+  L-=p.c?Math.log(Math.max(q,1e-9)):Math.log(Math.max(1-q,1e-9));
+  const pr=q>=t?1:0;if(pr===p.c)ok++;else if(pr)fp++;else fn++;}
+ return{loss:L/pts.length,ok:ok,fp:fp,fn:fn}}
+function wb(){const c=Math.cos(M.th),s=Math.sin(M.th);return{w1:M.k*c,w2:M.k*s,b:M.k*((.5-M.cx)*c+(.5-M.cy)*s)}}
+function setWb(w1,w2,b){const k2=w1*w1+w2*w2,k=Math.sqrt(k2);
+ if(k<1e-3){M.k=.05;return}
+ M.k=k;M.th=Math.atan2(w2,w1);M.cx=clamp(.5-b*w1/k2,-3,4);M.cy=clamp(.5-b*w2/k2,-3,4)}
+const REG=.003;
+function trainStep(lrw,lrb){const q=wb();let w1=q.w1,w2=q.w2,b=q.b,g1=0,g2=0,gb=0;
+ for(const p of pts){const u=p.x-.5,v=p.y-.5,e=sig(w1*u+w2*v+b)-p.c;g1+=e*u;g2+=e*v;gb+=e}
+ const n=pts.length;g1=g1/n+REG*w1;g2=g2/n+REG*w2;gb/=n;
+ setWb(w1-lrw*g1,w2-lrw*g2,b-lrb*gb)}
+let ref={ok:0,loss:.4};
+(function(){const s=Object.assign({},M);M.k=1;M.th=.8;M.cx=.5;M.cy=.5;
+ for(let i=0;i<9000;i++)trainStep(4,.8);
+ const r=lossAcc();ref={ok:r.ok,loss:r.loss};Object.assign(M,s)})();
+
+/* ---------- estado ---------- */
+let step=1,soft=0,interacted=false,dirty=true,heatKey='';
+let myst={x:.62,y:.44},thr=.5;
+let trainOn=false,done=false,hist=[],iter=0,startLoss=null,fast=false;
+const seen={1:true};
+
+/* ---------- canvas principal ---------- */
+const cv=$('#cv'),ctx=cv.getContext('2d');
+let W=300,H=300,DPR=1,PX=30,PY=10,PW=260,PH=260;
+function layout(){const r=cv.getBoundingClientRect();if(!r.width)return;W=r.width;H=r.height;DPR=Math.min(window.devicePixelRatio||1,2.5);
+ cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);PX=32;PY=10;PW=W-PX-10;PH=H-PY-30;dirty=true}
+const X=x=>PX+x*PW,Y=y=>PY+(1-y)*PH,iX=px=>(px-PX)/PW,iY=py=>1-(py-PY)/PH;
+const G=90,off=document.createElement('canvas');off.width=off.height=G;
+const octx=off.getContext('2d'),img=octx.createImageData(G,G);
+function heat(kEff){const c=Math.cos(M.th),s=Math.sin(M.th),d=img.data;
+ for(let j=0;j<G;j++){const y=1-(j+.5)/G;for(let i=0;i<G;i++){const x=(i+.5)/G;
+  const p=sig(kEff*((x-M.cx)*c+(y-M.cy)*s)),m=.62*Math.pow(Math.abs(2*p-1),.85),tr=p>=.5?[255,158,40]:[70,180,115],o=(j*G+i)*4;
+  d[o]=255+(tr[0]-255)*m;d[o+1]=250+(tr[1]-250)*m;d[o+2]=238+(tr[2]-238)*m;d[o+3]=255}}
+ octx.putImageData(img,0,0)}
+function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
+function seg(o){const c=Math.cos(M.th),s=Math.sin(M.th),px=M.cx+c*o,py=M.cy+s*o,dx=-s,dy=c;
+ ctx.beginPath();ctx.moveTo(X(px-dx*3),Y(py-dy*3));ctx.lineTo(X(px+dx*3),Y(py+dy*3));ctx.stroke()}
+function cliente(x,y,r,fill,plain){ctx.save();ctx.translate(x,y);
+ ctx.beginPath();ctx.arc(0,0,r*1.05,0,Math.PI*2);ctx.fillStyle=fill;ctx.fill();
+ ctx.lineWidth=1.6;ctx.strokeStyle='#2b2540';ctx.stroke();
+ if(!plain){ctx.clip();ctx.fillStyle='rgba(255,255,255,.88)';
+  ctx.beginPath();ctx.arc(0,-r*.28,r*.33,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(0,r*.72,r*.62,r*.46,0,0,Math.PI*2);ctx.fill()}
+ ctx.restore()}
+function pill(txt,x,y,bg,fg,size){ctx.font='700 '+(size||12)+'px system-ui,sans-serif';const w=ctx.measureText(txt).width+16,h=(size||12)+10;
+ x=clamp(x,w/2+2,W-w/2-2);y=clamp(y,h/2+2,H-h/2-2);
+ ctx.fillStyle=bg;rr(x-w/2,y-h/2,w,h,h/2);ctx.fill();ctx.fillStyle=fg;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(txt,x,y+.5)}
+function rotH(sf){const c=Math.cos(M.th),s=Math.sin(M.th),dx=-s,dy=c,L=.27;let sg=sf||1;
+ if(!sf){const x=M.cx+dx*L,y=M.cy+dy*L;if(!(x>.05&&x<.95&&y>.05&&y<.95))sg=-1}
+ return{s:sg,x:clamp(X(M.cx+sg*dx*L),PX+10,PX+PW-10),y:clamp(Y(M.cy+sg*dy*L),PY+10,PY+PH-10)}}
+function cenH(){return{x:clamp(X(M.cx),PX+10,PX+PW-10),y:clamp(Y(M.cy),PY+10,PY+PH-10)}}
+function arrow(x,y,dx,dy){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+dx*7,y+dy*7);ctx.stroke();
+ ctx.beginPath();ctx.moveTo(x+dx*9,y+dy*9);ctx.lineTo(x+dx*5-dy*3,y+dy*5+dx*3);ctx.lineTo(x+dx*5+dy*3,y+dy*5-dx*3);ctx.closePath();ctx.fill()}
+function handleCenter(h,pulse){
+ if(pulse){ctx.strokeStyle='rgba(109,74,255,'+(.5-.4*Math.abs(Math.sin(pulse*3)))+')';ctx.lineWidth=3;ctx.beginPath();ctx.arc(h.x,h.y,19+5*Math.abs(Math.sin(pulse*3)),0,7);ctx.stroke()}
+ ctx.fillStyle='#fff';ctx.strokeStyle='#2b2540';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(h.x,h.y,15,0,7);ctx.fill();ctx.stroke();
+ ctx.fillStyle='#2b2540';ctx.lineWidth=1.8;arrow(h.x,h.y,1,0);arrow(h.x,h.y,-1,0);arrow(h.x,h.y,0,1);arrow(h.x,h.y,0,-1)}
+function handleRot(h,pulse){
+ if(pulse){ctx.strokeStyle='rgba(109,74,255,'+(.5-.4*Math.abs(Math.sin(pulse*3+1)))+')';ctx.lineWidth=3;ctx.beginPath();ctx.arc(h.x,h.y,19+5*Math.abs(Math.sin(pulse*3+1)),0,7);ctx.stroke()}
+ ctx.fillStyle='#6d4aff';ctx.strokeStyle='#fff';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(h.x,h.y,15,0,7);ctx.fill();ctx.stroke();
+ ctx.strokeStyle='#fff';ctx.fillStyle='#fff';ctx.lineWidth=2.2;ctx.beginPath();ctx.arc(h.x,h.y,6,.3*Math.PI,1.7*Math.PI);ctx.stroke();
+ const a=1.7*Math.PI,ex=h.x+6*Math.cos(a),ey=h.y+6*Math.sin(a),tx=-Math.sin(a),ty=Math.cos(a),nx=Math.cos(a),ny=Math.sin(a);
+ ctx.beginPath();ctx.moveTo(ex+tx*5,ey+ty*5);ctx.lineTo(ex-nx*4,ey-ny*4);ctx.lineTo(ex+nx*4,ey+ny*4);ctx.closePath();ctx.fill()}
+
+function draw(){
+ const t=performance.now()/1000;
+ ctx.setTransform(DPR,0,0,DPR,0,0);ctx.clearRect(0,0,W,H);
+ const kEff=Math.exp(lerp(Math.log(400),Math.log(Math.max(M.k,.3)),soft));
+ const key=[M.cx,M.cy,M.th,kEff].map(v=>v.toFixed(4)).join();
+ if(key!==heatKey){heat(kEff);heatKey=key}
+ const c=Math.cos(M.th),s=Math.sin(M.th);
+ ctx.save();rr(PX,PY,PW,PH,16);ctx.clip();
+ ctx.imageSmoothingEnabled=true;ctx.drawImage(off,PX,PY,PW,PH);
+ ctx.strokeStyle='rgba(43,37,64,.07)';ctx.lineWidth=1;
+ for(let i=1;i<5;i++){ctx.beginPath();ctx.moveTo(X(i/5),PY);ctx.lineTo(X(i/5),PY+PH);ctx.stroke();ctx.beginPath();ctx.moveTo(PX,Y(i/5));ctx.lineTo(PX+PW,Y(i/5));ctx.stroke()}
+ ctx.lineCap='round';
+ if(step===4){
+  const o=Math.log(thr/(1-thr))/Math.max(M.k,.3),qx=M.cx+c*o,qy=M.cy+s*o,dx=-s,dy=c;
+  ctx.fillStyle='rgba(255,253,246,.55)';ctx.beginPath();
+  ctx.moveTo(X(qx-dx*3),Y(qy-dy*3));ctx.lineTo(X(qx+dx*3),Y(qy+dy*3));
+  ctx.lineTo(X(qx+dx*3-c*3),Y(qy+dy*3-s*3));ctx.lineTo(X(qx-dx*3-c*3),Y(qy-dy*3-s*3));ctx.closePath();ctx.fill();
+ }else if(soft>.05){
+  const o=2.197/Math.max(M.k,.3);ctx.setLineDash([5,6]);ctx.strokeStyle='rgba(43,37,64,'+(.4*soft)+')';ctx.lineWidth=1.5;seg(o);seg(-o);ctx.setLineDash([]);
+ }
+ ctx.strokeStyle='#fff';ctx.lineWidth=7;seg(0);ctx.strokeStyle='#2b2540';ctx.lineWidth=3.2;seg(0);
+ if(step===4){
+  const o=Math.log(thr/(1-thr))/Math.max(M.k,.3);
+  ctx.setLineDash([9,7]);ctx.strokeStyle='#fff';ctx.lineWidth=6;seg(o);ctx.strokeStyle='#6d4aff';ctx.lineWidth=3.2;seg(o);ctx.setLineDash([]);
+ }
+ ctx.restore();
+ ctx.strokeStyle='rgba(43,37,64,.35)';ctx.lineWidth=1.5;rr(PX,PY,PW,PH,16);ctx.stroke();
+ /* rótulos dos eixos */
+ ctx.fillStyle='#6b6580';ctx.font='600 11px system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+ ctx.fillText('baixa  ←  renda comprometida  →  alta',PX+PW/2,H-10);
+ ctx.save();ctx.translate(11,PY+PH/2);ctx.rotate(-Math.PI/2);ctx.fillText('poucos  ←  atrasos anteriores  →  muitos',0,0);ctx.restore();
+ /* clientes */
+ const r=clamp(W*.022,7,11),tt=step===4?thr:.5;
+ for(const p of pts){const q=prob(p.x,p.y),pr=q>=tt?1:0,px=X(p.x),py=Y(p.y);
+  if(pr!==p.c){ctx.strokeStyle='#e5484d';ctx.lineWidth=2.2;ctx.setLineDash([4,3]);ctx.beginPath();ctx.arc(px,py,r+5,0,7);ctx.stroke();ctx.setLineDash([])}
+  cliente(px,py,r,p.c?'#ffa122':'#48b877')}
+ /* pílulas de lado (passo 1) */
+ if(step===1){const h=cenH();
+  pill('inadimplente',X(M.cx+c*.17),Y(M.cy+s*.17),'rgba(242,140,15,.92)','#fff',11);
+  pill('bom pagador',X(M.cx-c*.17),Y(M.cy-s*.17),'rgba(47,158,95,.92)','#fff',11)}
+ /* cliente misterioso */
+ if(step===2||step===4){
+  const q=prob(myst.x,myst.y),mx=X(myst.x),my=Y(myst.y),pu=Math.abs(Math.sin(t*3));
+  ctx.strokeStyle='rgba(109,74,255,'+(.55-.35*pu)+')';ctx.lineWidth=3;ctx.beginPath();ctx.arc(mx,my,r*1.9+4*pu,0,7);ctx.stroke();
+  cliente(mx,my,r*1.5,rgb(mixc(GREEN,ORANGE,q)),true);
+  ctx.fillStyle='#fff';ctx.font='800 '+(r*1.5)+'px system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('?',mx-1,my+1);
+  pill(Math.round(q*100)+'% inadimplente',mx,my-r*2.6-8,'#2b2540','#fff',12)}
+ /* alças */
+ if(!(step===3&&trainOn)){
+  const pul=(!interacted&&step===1)?t:0,ch=cenH(),rh=rotH();
+  handleCenter(ch,pul);handleRot(rh,pul);
+  if(pul)pill('👆 arraste!',rh.x,rh.y-30,'#2b2540','#fff',12)}
+}
+
+/* ---------- interação ---------- */
+let drag=null;
+const ptr=e=>{const r=cv.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}};
+const dst=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+function setMyst(p){myst.x=clamp(iX(p.x),.02,.98);myst.y=clamp(iY(p.y),.02,.98)}
+function hitPoint(p){let best=null,bd=24;for(const q of pts){const d=Math.hypot(X(q.x)-p.x,Y(q.y)-p.y);if(d<bd){bd=d;best=q}}return best}
+cv.addEventListener('pointerdown',function(e){
+ const p=ptr(e);const handles=!(step===3&&trainOn);
+ const rh=rotH(),ch=cenH();
+ if(handles&&dst(p,rh)<=26)drag={t:'rot',s:rh.s};
+ else if(handles&&dst(p,ch)<=26)drag={t:'mv',ox:0,oy:0,};
+ else if(step===3&&hitPoint(p))drag={t:'pt',pt:hitPoint(p)};
+ else if(step===2||step===4){drag={t:'myst'};setMyst(p)}
+ else if((step===1||step===3)&&handles)drag={t:'mv',ox:M.cx-iX(p.x),oy:M.cy-iY(p.y)};
+ if(drag){interacted=true;try{cv.setPointerCapture(e.pointerId)}catch(_){}e.preventDefault();dirty=true;cv.style.cursor='grabbing'}});
+cv.addEventListener('pointermove',function(e){if(!drag)return;const p=ptr(e),mx=iX(p.x),my=iY(p.y);
+ if(drag.t==='rot'){const rx=mx-M.cx,ry=my-M.cy;if(Math.hypot(rx,ry)>.03){const l=Math.hypot(rx,ry),dx=drag.s*rx/l,dy=drag.s*ry/l;M.th=Math.atan2(-dx,dy)}}
+ else if(drag.t==='mv'){M.cx=clamp(mx+drag.ox,0,1);M.cy=clamp(my+drag.oy,0,1)}
+ else if(drag.t==='pt'){drag.pt.x=clamp(mx,.03,.97);drag.pt.y=clamp(my,.03,.97);if(hist.length)retrain()}
+ else if(drag.t==='myst')setMyst(p);
+ dirty=true;e.preventDefault()});
+function endDrag(){drag=null;cv.style.cursor='grab'}
+cv.addEventListener('pointerup',endDrag);cv.addEventListener('pointercancel',endDrag);
+cv.addEventListener('keydown',function(e){const st=.02;let h=true;
+ switch(e.key){case'ArrowLeft':M.cx-=st;break;case'ArrowRight':M.cx+=st;break;case'ArrowUp':M.cy+=st;break;case'ArrowDown':M.cy-=st;break;case'[':M.th-=.08;break;case']':M.th+=.08;break;default:h=false}
+ if(h){e.preventDefault();interacted=true;dirty=true}});
+
+/* ---------- treino ---------- */
+function retrain(){if(!trainOn){trainOn=true;done=false;updateBtn()}}
+function trainTick(){
+ const n=fast?6:2;for(let i=0;i<n;i++)trainStep(1.6,.5);
+ const L=lossAcc().loss;hist.push(L);iter++;
+ if((iter>50&&hist.length>21&&Math.abs(hist[hist.length-21]-L)<3e-5)||iter>1800){trainOn=false;done=true;updateBtn()}
+ dirty=true}
+function updateBtn(){$('#btnTrain').textContent=trainOn?'⏸ Pausar':(done?'▶ Treinar de novo':'▶ Treinar')}
+$('#btnTrain').addEventListener('click',function(){
+ interacted=true;
+ if(trainOn){trainOn=false;updateBtn();return}
+ if(done){scramble()}
+ if(!hist.length)startLoss=lossAcc().loss;
+ trainOn=true;done=false;updateBtn()});
+function scramble(){M.cx=.25+Math.random()*.5;M.cy=.25+Math.random()*.5;M.th=Math.random()*Math.PI*2;M.k=6+Math.random()*30;
+ hist=[];iter=0;done=false;trainOn=false;startLoss=lossAcc().loss;updateBtn();dirty=true}
+$('#btnScramble').addEventListener('click',function(){interacted=true;scramble();trainOn=false;updateBtn()});
+$('#btnRestore').addEventListener('click',function(){pts.forEach(function(p,i){p.x=orig[i].x;p.y=orig[i].y});if(hist.length){done=false;trainOn=true;updateBtn()}dirty=true});
+$('#btnSpeed').addEventListener('click',function(){fast=!fast;this.textContent=fast?'🐢 Devagar':'⏩ Rápido'});
+
+/* ---------- controles ---------- */
+const KMIN=1,KMAX=60;
+const sToK=s=>KMIN*Math.pow(KMAX/KMIN,s/100),kToS=k=>100*Math.log(clamp(k,KMIN,KMAX)/KMIN)/Math.log(KMAX/KMIN);
+$('#kSlider').addEventListener('input',function(){M.k=sToK(+this.value);interacted=true;dirty=true});
+$('#thrSlider').addEventListener('input',function(){thr=+this.value/100;dirty=true});
+$$('[data-t]').forEach(function(b){b.addEventListener('click',function(){thr=+b.dataset.t/100;$('#thrSlider').value=b.dataset.t;dirty=true})});
+
+/* ---------- passos ---------- */
+const missions={1:'Você é analista de crédito 🏦 Arraste a linha para separar os bons pagadores dos inadimplentes.',
+ 2:'Toque no gráfico para colocar um cliente misterioso e ver a chance de ele dar calote.',
+ 3:'Aperte Treinar e veja o modelo achar a melhor linha sozinho.',
+ 4:'Quanta certeza você exige para negar crédito a um cliente?'};
+const ctitles={2:'Distância da linha → chance de inadimplência',3:'Erro caindo a cada rodada de treino',4:'Onde o seu corte cai na curva'};
+function go(n,scroll){
+ step=n;seen[n]=true;
+ $$('.sb').forEach(function(e){e.hidden=+e.dataset.s!==n});
+ $$('#steps button').forEach(function(b){const s=+b.dataset.s;b.classList.toggle('on',s===n);b.classList.toggle('seen',!!seen[s])});
+ $('#mission').textContent=missions[n];
+ const box=$('#chartBox');
+ if(n>=2){$('#slot'+n).appendChild(box);box.hidden=false;$('#chartTitle').textContent=ctitles[n]}else box.hidden=true;
+ if(n!==3&&trainOn){trainOn=false;updateBtn()}
+ if(n===3&&startLoss===null&&!hist.length)startLoss=lossAcc().loss;
+ $('#prev').disabled=n===1;
+ const nx=$('#next');nx.textContent=n===4?'↺ Recomeçar':'Próximo →';
+ layoutChart();heatKey='';dirty=true;
+ if(scroll&&window.innerWidth<920)$('#stage').scrollIntoView({behavior:'smooth',block:'start'})}
+$$('#steps button').forEach(function(b){b.addEventListener('click',function(){go(+b.dataset.s,true)})});
+$('#prev').addEventListener('click',function(){if(step>1)go(step-1,true)});
+$('#next').addEventListener('click',function(){go(step===4?1:step+1,true)});
+
+/* ---------- gráfico auxiliar ---------- */
+const cc=$('#chart'),cctx=cc.getContext('2d');let cw=300,chh=150,CDPR=1;
+function layoutChart(){const r=cc.getBoundingClientRect();if(!r.width)return;cw=r.width;chh=r.height;CDPR=Math.min(window.devicePixelRatio||1,2.5);
+ cc.width=Math.round(cw*CDPR);cc.height=Math.round(chh*CDPR);dirty=true}
+function drawChart(){
+ if(step===1||$('#chartBox').hidden)return;
+ const g=cctx;g.setTransform(CDPR,0,0,CDPR,0,0);g.clearRect(0,0,cw,chh);
+ const pl=36,pr=12,pt=12,pb=26,iw=cw-pl-pr,ih=chh-pt-pb;
+ g.font='600 11px system-ui,sans-serif';g.textBaseline='middle';
+ if(step===3){
+  const top=Math.max(.8,Math.min(hist[0]||0,4)),xm=Math.max(120,hist.length);
+  const cx=i=>pl+i/xm*iw,cy=L=>pt+(1-clamp(L,0,top)/top)*ih;
+  g.strokeStyle='rgba(43,37,64,.15)';g.lineWidth=1;g.beginPath();g.moveTo(pl,pt);g.lineTo(pl,pt+ih);g.lineTo(pl+iw,pt+ih);g.stroke();
+  g.fillStyle='#6b6580';g.textAlign='right';g.fillText(top.toFixed(1),pl-5,pt+4);g.fillText('0',pl-5,pt+ih);
+  g.textAlign='center';g.fillText('rodadas de treino →',pl+iw/2,chh-8);
+  g.strokeStyle='#2f9e5f';g.setLineDash([6,5]);g.lineWidth=1.8;g.beginPath();g.moveTo(pl,cy(ref.loss));g.lineTo(pl+iw,cy(ref.loss));g.stroke();g.setLineDash([]);
+  g.fillStyle='#2f9e5f';g.textAlign='right';g.fillText('melhor possível',pl+iw,cy(ref.loss)-8);
+  if(hist.length>1){g.strokeStyle='#6d4aff';g.lineWidth=3;g.lineJoin='round';g.beginPath();
+   const st=Math.max(1,Math.floor(hist.length/300));
+   for(let i=0;i<hist.length;i+=st){const x=cx(i),y=cy(hist[i]);i?g.lineTo(x,y):g.moveTo(x,y)}
+   g.stroke();const l=hist.length-1;g.fillStyle='#6d4aff';g.beginPath();g.arc(cx(l),cy(hist[l]),5,0,7);g.fill()}
+  else{const L=lossAcc().loss;g.fillStyle='#6d4aff';g.beginPath();g.arc(pl+6,cy(L),5,0,7);g.fill();g.fillStyle='#6b6580';g.textAlign='center';g.fillText('aperte Treinar',pl+iw/2,pt+ih/2)}
+  return}
+ const xr=.6,cx=d=>pl+(d+xr)/(2*xr)*iw,cy=p=>pt+(1-p)*ih;
+ if(step===4){const dt=Math.log(thr/(1-thr))/Math.max(M.k,.3),xx=clamp(cx(dt),pl,pl+iw);
+  g.fillStyle='rgba(47,158,95,.14)';g.fillRect(pl,pt,xx-pl,ih);g.fillStyle='rgba(242,140,15,.18)';g.fillRect(xx,pt,pl+iw-xx,ih);
+  g.strokeStyle='#6d4aff';g.lineWidth=2.2;g.setLineDash([6,5]);g.beginPath();g.moveTo(pl,cy(thr));g.lineTo(pl+iw,cy(thr));g.moveTo(xx,pt);g.lineTo(xx,pt+ih);g.stroke();g.setLineDash([]);
+  g.fillStyle='#6d4aff';g.textAlign='left';g.fillText('corte '+Math.round(thr*100)+'%',pl+6,cy(thr)-8)}
+ g.strokeStyle='rgba(43,37,64,.15)';g.lineWidth=1;
+ [0,.5,1].forEach(function(p){g.beginPath();g.moveTo(pl,cy(p));g.lineTo(pl+iw,cy(p));g.stroke()});
+ g.beginPath();g.moveTo(cx(0),pt);g.lineTo(cx(0),pt+ih);g.stroke();
+ g.fillStyle='#6b6580';g.textAlign='right';g.fillText('100%',pl-5,cy(1)+3);g.fillText('50%',pl-5,cy(.5));g.fillText('0%',pl-5,cy(0)-3);
+ g.textAlign='left';g.fillText('← bom pagador',pl,chh-8);g.textAlign='center';g.fillText('na linha',cx(0),chh-8);g.textAlign='right';g.fillText('inadimplente →',pl+iw,chh-8);
+ const gr=g.createLinearGradient(pl,0,pl+iw,0);gr.addColorStop(0,'#2f9e5f');gr.addColorStop(.5,'#c9b98f');gr.addColorStop(1,'#f28c0f');
+ g.strokeStyle=gr;g.lineWidth=4.5;g.lineCap='round';g.beginPath();
+ for(let i=0;i<=120;i++){const d=-xr+2*xr*i/120,x=cx(d),y=cy(sig(M.k*d));i?g.lineTo(x,y):g.moveTo(x,y)}
+ g.stroke();
+ const c=Math.cos(M.th),s=Math.sin(M.th),d=clamp((myst.x-M.cx)*c+(myst.y-M.cy)*s,-xr,xr),q=sig(M.k*d);
+ g.strokeStyle='rgba(43,37,64,.4)';g.setLineDash([3,4]);g.lineWidth=1.5;g.beginPath();g.moveTo(cx(d),pt+ih);g.lineTo(cx(d),cy(q));g.lineTo(pl,cy(q));g.stroke();g.setLineDash([]);
+ g.fillStyle=rgb(mixc(GREEN,ORANGE,q));g.strokeStyle='#2b2540';g.lineWidth=2.5;g.beginPath();g.arc(cx(d),cy(q),8,0,7);g.fill();g.stroke()}
+
+/* ---------- HUD e textos ---------- */
+const cache={};
+function T(id,v){if(cache[id]!==v){cache[id]=v;$('#'+id).textContent=v}}
+function verbal(p){return p<.1?'quase certeza de que paga em dia':p<.35?'provavelmente paga em dia':p<.65?'na dúvida!':p<.9?'provavelmente inadimplente':'quase certeza de calote'}
+function updateUI(){
+ const n=pts.length,r=lossAcc(step===4?thr:.5),r5=step===4?lossAcc(.5):r;
+ const trk=$('#trk');trk.classList.toggle('grad',step===2);
+ const q=prob(myst.x,myst.y);
+ if(step===1){T('hudMain',r.ok+' / '+n);T('hudSub','clientes no lado certo da linha');$('#fill').style.width=(r.ok/n*100)+'%';
+  let v;
+  if(r.ok>=ref.ok)v='🎉 <b>Você igualou a máquina</b> ('+ref.ok+' acertos)! Já pode ir para o próximo passo.';
+  else if(r.ok<n*.5)v='🙃 Está acertando <b>menos que um chute</b>: a linha deve estar virada ao contrário. Olhe qual lado está alaranjado (o de inadimplentes).';
+  else if(r.ok>=ref.ok-2)v='🔥 <b>Quase lá!</b> A máquina consegue '+ref.ok+'. Ajuste só mais um pouquinho.';
+  else v='Tente girar (↻) e deslocar (✥) a linha. Dica: os clientes seguem uma diagonal ↗.';
+  if(cache.v1!==v){cache.v1=v;$('#verdict1').innerHTML=v}}
+ else if(step===2){const pc=Math.round(q*100);T('hudMain',pc+'%');T('hudSub','de chance de calote · '+verbal(q));$('#mk').style.left=(q*100)+'%';
+  let c2;if(q>.42&&q<.58)c2='Bem em cima da linha: é quase <b>cara ou coroa</b> (≈50%). A linha é o ponto de dúvida, não um muro.';
+  else if(q>=.9||q<=.1)c2='Longe da linha: quase <b>certeza</b>. A distância até a linha vira confiança.';
+  else c2='No meio do caminho: já existe um palpite, mas com <b>cautela</b>. Mova o cliente e veja a chance mudar.';
+  if(cache.c2!==c2){cache.c2=c2;$('#cap2').innerHTML=c2}
+  const k=M.k;T('kcap',k<4?'Muito cautelosa: quase tudo vira dúvida (perto de 50%).':k<12?'Cautelosa: a passagem de bom pagador para inadimplente é bem suave.':k<30?'Equilibrada: certeza longe da linha, dúvida só perto dela.':'Radical: quase um muro — sim ou não, sem meio-termo. Cuidado: parecer certo não é estar certo!');
+  const sv=Math.round(kToS(k));if(Math.abs(+$('#kSlider').value-sv)>1&&!(drag))$('#kSlider').value=sv}
+ else if(step===3){T('hudMain','Erro '+r.loss.toFixed(2));T('hudSub','rodada '+iter+' · acertos '+r.ok+'/'+n);$('#fill').style.width=(r.ok/n*100)+'%';
+  let m;if(!hist.length&&!trainOn)m='Aperte <b>Treinar</b> e olhe a linha se mexer sozinha.';
+  else{m='Erro antes: <b>'+(startLoss===null?r.loss:startLoss).toFixed(2)+'</b> → agora: <b>'+r.loss.toFixed(2)+'</b> (melhor possível ≈ '+ref.loss.toFixed(2)+').';
+   if(done)m+=' ✅ Pronto: a máquina achou a linha que erra menos!';else if(trainOn)m+=' Aprendendo…'}
+  if(cache.m3!==m){cache.m3=m;$('#cmp3').innerHTML=m}}
+ else{const pc=Math.round(thr*100);T('hudMain','Corte '+pc+'%');T('hudSub',r.ok+'/'+n+' certas · '+r.fp+' bons recusados · '+r.fn+' calotes aprovados');$('#fill').style.width=(r.ok/n*100)+'%';
+  T('thrVal','Corte: '+pc+'%');T('fpn',String(r.fp));T('fnn',String(r.fn));
+  const c4=thr>=.75?'<b>Permissivo:</b> você só nega crédito quando tem muita certeza do risco. Quase ninguém é recusado sem motivo, mas vários calotes passam.':thr<=.3?'<b>Rigoroso:</b> você nega ao menor sinal de risco. Poucos calotes passam, mas muitos bons pagadores ficam sem crédito.':'<b>Equilibrado:</b> erra um pouco para cada lado. O melhor corte depende de qual erro custa mais — em geral, um calote sai bem mais caro que um cliente recusado.';
+  if(cache.c4!==c4){cache.c4=c4;$('#cap4').innerHTML=c4}}
+ if($('#mathDet').open){
+  const c=Math.cos(M.th),s=Math.sin(M.th),w1=M.k*c,w2=M.k*s,b=-M.k*(M.cx*c+M.cy*s),f=function(v){return(v<0?'− ':'+ ')+Math.abs(v).toFixed(1)};
+  const z=w1*myst.x+w2*myst.y+b,rr2=lossAcc();
+  $('#mathTxt').textContent='1) nota de risco do cliente\n   z = '+w1.toFixed(1)+'·dívida '+f(w2)+'·atrasos '+f(b)+'\n   (dívida = renda comprometida; dívida e atrasos vão de 0 a 1)\n\n2) chance de inadimplência\n   p = 1 / (1 + e^(−z))\n   cliente misterioso: dívida='+myst.x.toFixed(2)+', atrasos='+myst.y.toFixed(2)+'\n   z = '+z.toFixed(2)+'  →  p = '+Math.round(sig(z)*100)+'%\n\n3) erro (log-loss)\n   média de −ln(chance dada à resposta certa)\n   agora: '+rr2.loss.toFixed(3)}}
+
+/* ---------- loop ---------- */
+function frame(){
+ const target=step>=2?1:0;
+ if(Math.abs(soft-target)>.003){soft+=(target-soft)*.12;dirty=true}else if(soft!==target){soft=target;dirty=true}
+ if(trainOn)trainTick();
+ if((step===1&&!interacted)||step===2||step===4)dirty=true;
+ if(dirty){dirty=false;draw();drawChart();updateUI()}
+ requestAnimationFrame(frame)}
+
+function relayout(){layout();layoutChart()}
+if(window.ResizeObserver){new ResizeObserver(relayout).observe($('#cvwrap'))}
+window.addEventListener('resize',relayout);
+$('#mathDet').addEventListener('toggle',function(){dirty=true});
+relayout();go(1,false);requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
+<!-- Final: HTML completo -->
